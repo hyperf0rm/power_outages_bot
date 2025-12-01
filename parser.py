@@ -54,12 +54,13 @@ class Parser:
         for i in range(dates_count):
             for value in places_dict.get(f'date_{i}'):
                 for address in self.addresses:
-                    if address in value:
-                        results_list.append(f'{dates[i]}\n{value}')
+                    if address.lower() in value.lower():
+                        results_list.append(f'{dates[i]}\n\n{value}')
 
         if not results_list:
-            return 'Нет информации об отключении электроэнергии по вашему адресу в ближайшие дни'
+            return """Нет информации об отключении электроэнергии
+                      по вашим адресам в ближайшие дни"""
         else:
             for i in range(len(results_list)):
-                result = "\n".join(results_list)
+                result = "\n\n".join(results_list)
                 return result

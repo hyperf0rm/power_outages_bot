@@ -25,6 +25,7 @@ try:
 except Error as e:
     print(f"Error connecting to PostgreSQL: {e}")
 
+
 @bot.message_handler(commands=["start"])
 def start(message):
     user_id = message.chat.id
@@ -34,8 +35,16 @@ def start(message):
     cursor = conn.cursor()
     cursor.execute(query, (user_id,))
     conn.commit()
-    if cursor.rowcount == 1:
-        bot.send_message(user_id, "Бот активирован")
+    # if cursor.rowcount == 1:
+    bot_msg = """Теперь вы в базе...\n\n
+                 Что умеет этот бот:\n
+                 /add - добавить адрес
+                 /delete - удалить адрес
+                 /show - показать ваши добавленные адреса
+                 /my - проверить отключения по вашим адресам
+                 /check - проверить конкретный адрес
+                 /start - информация об этом боте"""
+    bot.send_message(user_id, bot_msg)
 
 
 @bot.message_handler(commands=["add"])
@@ -82,6 +91,7 @@ def delete(message):
         bot_msg = "Этот адрес не был вами добавлен"
     bot.send_message(user_id, bot_msg)
 
+
 @bot.message_handler(commands=["show"])
 def show(message):
     user_id = message.chat.id
@@ -97,6 +107,7 @@ def show(message):
         bot_msg = "Вы не добавили ни один адрес"
     bot.send_message(user_id, bot_msg)
 
+
 @bot.message_handler(commands=["my"])
 def check(message):
     user_id = message.chat.id
@@ -109,6 +120,7 @@ def check(message):
     parser = Parser(list)
     result = parser.parse_website()
     bot.send_message(user_id, result)
+
 
 @bot.message_handler(commands=["check"])
 def parse(message):
