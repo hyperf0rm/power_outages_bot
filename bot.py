@@ -41,9 +41,12 @@ def start(message):
 @bot.message_handler(commands=["add"])
 def add(message):
     user_id = message.chat.id
+    if message.text == "/add":
+        bot.send_message(user_id, "Добавьте адрес вместе с командой")
+        return
     address = message.text.replace("/add ", "")
     cursor = conn.cursor()
-    cursor.execute("""SELECT EXISTS 
+    cursor.execute("""SELECT EXISTS
                    (SELECT 1 FROM light_bot.addresses
                    WHERE user_id = %s AND address = %s);""",
                    (user_id, address))
@@ -62,6 +65,9 @@ def add(message):
 @bot.message_handler(commands=["delete"])
 def delete(message):
     user_id = message.chat.id
+    if message.text == "/delete":
+        bot.send_message(user_id, "Добавьте адрес вместе с командой")
+        return
     address = message.text.replace("/delete ", "")
     cursor = conn.cursor()
     cursor.execute("""DELETE FROM light_bot.addresses
@@ -91,19 +97,29 @@ def show(message):
         bot_msg = "Вы не добавили ни один адрес"
     bot.send_message(user_id, bot_msg)
 
-@bot.message_handler(commands=["check"])
+@bot.message_handler(commands=["my"])
 def check(message):
     user_id = message.chat.id
-    "checks if address is fucked in the next few days"
-    pass
+    cur = conn.cursor()
+    query = """SELECT address FROM light_bot.addresses
+               WHERE user_id = %s;"""
+    cur.execute(query, (user_id,))
+    addresses = cur.fetchall()
+    list = [address[0] for address in addresses]
+    parser = Parser(list)
+    result = parser.parse_website()
+    bot.send_message(user_id, result)
 
-@bot.message_handler()
+@bot.message_handler(commands=["check"])
 def parse(message):
     user_id = message.chat.id
-    address = message.text
-    parser = Parser(address)
+    if message.text == "/check":
+        bot.send_message(user_id, "Добавьте адрес вместе с командой")
+        return
+    address = message.text.replace("/check ", "")
+    parser = Parser([address])
     result = parser.parse_website()
-    bot.send_message(user_id, text=result)
+    bot.send_message(user_id, result)
 
 
 bot.infinity_polling()
