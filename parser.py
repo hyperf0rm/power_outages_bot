@@ -28,7 +28,6 @@ class Parser:
         response = requests.get(self.url, self.headers)
         page = BeautifulSoup(response.text, "html.parser")
         dates_count = page.get_text().count('текущего года')
-        print(f'date count: {dates_count}')
         ps = page.find_all('p')
         dates = self.create_date_list(dates_count)
         places_dict = self.create_places_dict(dates_count)
@@ -39,29 +38,23 @@ class Parser:
         for p in ps:
             string = str(p.get_text())
             if 'текущего года' in string:
-                print(string)
                 if first_iteration is True:
                     dates[date_index] = string
-                    print(f'first_iter: {dates}')
                     first_iteration = False
                     continue
+                places_dict[f'date_{date_index}'] = places
                 date_index += 1
                 dates[date_index] = string
-                print(f'other_iter: {dates}')
-                places_dict[f'date_{date_index}'] = places
                 places = []
                 continue
             places.append(string)
         places_dict[f'date_{date_index}'] = places
-        print(places_dict)
 
         results_list = []
         for i in range(dates_count):
-            print(i)
             for value in places_dict.get(f'date_{i}'):
                 for address in self.addresses:
                     if address in value:
-                        print(i)
                         results_list.append(f'{dates[i]}\n{value}')
 
         if not results_list:
