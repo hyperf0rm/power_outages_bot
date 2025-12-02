@@ -36,14 +36,13 @@ def start(message):
     cursor.execute(query, (user_id,))
     conn.commit()
     # if cursor.rowcount == 1:
-    bot_msg = """Теперь вы в базе...\n\n
-                 Что умеет этот бот:\n
-                 /add - добавить адрес
-                 /delete - удалить адрес
-                 /show - показать ваши добавленные адреса
-                 /my - проверить отключения по вашим адресам
-                 /check - проверить конкретный адрес
-                 /start - информация об этом боте"""
+    bot_msg = """Что умеет этот бот:\n
+    /add - добавить адрес\n
+    /delete - удалить адрес\n
+    /show - показать ваши добавленные адреса\n
+    /my - проверить отключения по вашим адресам\n
+    /check - проверить конкретный адрес\n
+    /start - информация об этом боте"""
     bot.send_message(user_id, bot_msg)
 
 
@@ -132,6 +131,12 @@ def parse(message):
     parser = Parser([address])
     result = parser.parse_website()
     bot.send_message(user_id, result)
+
+
+@bot.message_handler()
+def msg(message):
+    user_id = message.chat.id
+    bot.send_message(user_id, "Список доступных команд: /start")
 
 
 bot.infinity_polling()

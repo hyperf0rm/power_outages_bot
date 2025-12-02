@@ -58,8 +58,8 @@ class Parser:
                         results_list.append(f'{dates[i]}\n\n{value}')
 
         if not results_list:
-            return """Нет информации об отключении электроэнергии
-                      по вашим адресам в ближайшие дни"""
+            return "Нет информации об отключении электроэнергии " \
+                   "по вашим адресам в ближайшие дни"
         else:
             for i in range(len(results_list)):
                 result = "\n\n".join(results_list)
