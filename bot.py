@@ -3,23 +3,47 @@ from dotenv import load_dotenv
 import os
 from parser import Parser
 from psycopg2 import connect, Error
+import logging
+import sys
+from exceptions import MissingEnvironmentVariableException
 
 load_dotenv()
 
-token = os.getenv("TOKEN")
-bot = TeleBot(token=token)
+TOKEN = os.getenv("TOKEN")
 
-host = os.getenv("HOST")
-db = os.getenv("DATABASE")
-user = os.getenv("USER")
-password = os.getenv("PASSWORD")
+RETRY_PERIOD = os.getenv("RETRY_PERIOD")
+
+DB_HOST = os.getenv("DB_HOST")
+DB = os.getenv("DATABASE")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+def check_env_vars():
+    """Check environment variables existence."""
+    env_variables = {
+        "TELEGRAM_TOKEN": TOKEN,
+        "RETRY_PERIOD": RETRY_PERIOD,
+        "DB_HOST": DB_HOST,
+        "DATABASE": DB,
+        "DB_USER": DB_USER,
+        "DB_PASSWORD": DB_PASSWORD
+    }
+    
+    var_found = True
+
+    for var_name, var in env_variables.items():
+        if not var:
+            logging.critical(f'Missing required environment variable: {var_name}. Bot stopped.')
+            var_found = False
+    return var_found
+
 
 try:
     conn = connect(
-        host=host,
-        database=db,
-        user=user,
-        password=password
+        host=DB_HOST,
+        database=DB,
+        user=DB_USER,
+        password=DB
     )
     print("Connected to PostgreSQL successfully!")
 except Error as e:
@@ -137,6 +161,11 @@ def parse(message):
 def msg(message):
     user_id = message.chat.id
     bot.send_message(user_id, "Список доступных команд: /start")
+
+def main():
+
+
+    
 
 
 bot.infinity_polling()
