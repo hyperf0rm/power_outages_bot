@@ -6,17 +6,22 @@ from psycopg2 import connect, Error
 import logging
 import sys
 from exceptions import MissingEnvironmentVariableException
+import time
+import threading
 
 load_dotenv()
 
 TOKEN = os.getenv("TOKEN")
 
-RETRY_PERIOD = os.getenv("RETRY_PERIOD")
+RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
 DB_HOST = os.getenv("DB_HOST")
 DB = os.getenv("DATABASE")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+bot = TeleBot(token=TOKEN)
+
 
 def check_env_vars():
     """Check environment variables existence."""
@@ -28,7 +33,7 @@ def check_env_vars():
         "DB_USER": DB_USER,
         "DB_PASSWORD": DB_PASSWORD
     }
-    
+
     var_found = True
 
     for var_name, var in env_variables.items():
@@ -43,7 +48,7 @@ try:
         host=DB_HOST,
         database=DB,
         user=DB_USER,
-        password=DB
+        password=DB_PASSWORD
     )
     print("Connected to PostgreSQL successfully!")
 except Error as e:
@@ -157,15 +162,53 @@ def parse(message):
     bot.send_message(user_id, result)
 
 
-@bot.message_handler()
+@bot.message_handler(commands=["start"])
 def msg(message):
     user_id = message.chat.id
     bot.send_message(user_id, "Список доступных команд: /start")
 
+
 def main():
+    if not check_env_vars:
+        raise MissingEnvironmentVariableException("Missing required environment variable.")
+
+    while True:
+        try:
+            cur = conn.cursor()
+            query = """SELECT user_id FROM light_bot.users;"""
+            cur.execute(query)
+            user_ids = cur.fetchall()
+            for user_id in user_ids:
+                print(user_id)
+                query = """SELECT address FROM light_bot.addresses
+                WHERE user_id = %s;"""
+                cur.execute(query, (user_id[0],))
+                addresses = cur.fetchall()
+                list = [address[0] for address in addresses]
+                print(list)
+                parser = Parser(list)
+                result = parser.parse_website()
+                query = """SELECT last_message FROM light_bot.users
+                WHERE user_id = %s;"""
+                cur.execute(query, (user_id,))
+                last_msg = cur.fetchone()[0]
+                if result != last_msg:
+                    bot.send_message(user_id[0], result)
+                    query = """UPDATE light_bot.users
+                    SET last_message = %s
+                    WHERE user_id = %s;"""
+                    cur.execute(query, (result, user_id[0]))
+                    conn.commit()
+        except Exception as error:
+            print(f'Error sending message: {error}')
+
+        finally:
+            cur.close()
+            time.sleep(RETRY_PERIOD)
 
 
-    
-
+thread = threading.Thread(target=main)
+thread.daemon = True
+thread.start()
 
 bot.infinity_polling()
