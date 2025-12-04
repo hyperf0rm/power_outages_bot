@@ -22,6 +22,12 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 bot = TeleBot(token=TOKEN)
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    stream=sys.stdout
+)
+
 
 def check_env_vars():
     """Check environment variables existence."""
@@ -44,14 +50,16 @@ def check_env_vars():
 
 
 try:
+    logging.debug("Starting connecting to the database")
     conn = connect(
         host=DB_HOST,
         database=DB,
         user=DB_USER,
         password=DB_PASSWORD
     )
-    print("Connected to PostgreSQL successfully!")
+    logging.debug("Connected to PostgreSQL successfully!")
 except Error as e:
+    logging.critical(f"Error connecting to PostgreSQL: {e}")
     print(f"Error connecting to PostgreSQL: {e}")
 
 
