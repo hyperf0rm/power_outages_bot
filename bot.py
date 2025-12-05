@@ -1,4 +1,4 @@
-from telebot import TeleBot
+from telebot import TeleBot, apihelper
 from dotenv import load_dotenv
 import os
 from parser import Parser
@@ -58,14 +58,14 @@ try:
         password=DB_PASSWORD
     )
     logging.debug("Connected to PostgreSQL successfully!")
-except Error as e:
-    logging.critical(f"Error connecting to PostgreSQL: {e}")
-    print(f"Error connecting to PostgreSQL: {e}")
+except Error as error:
+    logging.critical(f"Error connecting to PostgreSQL: {error}")
 
 
 @bot.message_handler(commands=["start"])
 def start(message):
     user_id = message.chat.id
+    logging.debug(f"Starting sending /start message to user {user_id}")
     query = """INSERT INTO light_bot.users (user_id)
                VALUES (%s)
                ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
@@ -86,6 +86,7 @@ def start(message):
 @bot.message_handler(commands=["add"])
 def add(message):
     user_id = message.chat.id
+    logging.debug(f"Starting sending /add message to user {user_id}")
     if message.text == "/add":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -110,6 +111,7 @@ def add(message):
 @bot.message_handler(commands=["delete"])
 def delete(message):
     user_id = message.chat.id
+    logging.debug(f"Starting sending /delete message to user {user_id}")
     if message.text == "/delete":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -131,6 +133,7 @@ def delete(message):
 @bot.message_handler(commands=["show"])
 def show(message):
     user_id = message.chat.id
+    logging.debug(f"Starting sending /show message to user {user_id}")
     cur = conn.cursor()
     query = """SELECT address FROM light_bot.addresses
                WHERE user_id = %s;"""
@@ -147,6 +150,7 @@ def show(message):
 @bot.message_handler(commands=["my"])
 def check(message):
     user_id = message.chat.id
+    logging.debug(f"Starting sending /my message to user {user_id}")
     cur = conn.cursor()
     query = """SELECT address FROM light_bot.addresses
                WHERE user_id = %s;"""
@@ -161,6 +165,7 @@ def check(message):
 @bot.message_handler(commands=["check"])
 def parse(message):
     user_id = message.chat.id
+    logging.debug(f"Starting sending /check message to user {user_id}")
     if message.text == "/check":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -170,9 +175,10 @@ def parse(message):
     bot.send_message(user_id, result)
 
 
-@bot.message_handler(commands=["start"])
+@bot.message_handler()
 def msg(message):
     user_id = message.chat.id
+    logging.debug(f"Starting sending general message to user {user_id}")
     bot.send_message(user_id, "Список доступных команд: /start")
 
 
