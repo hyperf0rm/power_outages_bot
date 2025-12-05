@@ -1,4 +1,4 @@
-from telebot import TeleBot, apihelper
+from telebot import TeleBot
 from dotenv import load_dotenv
 import os
 from parser import Parser
