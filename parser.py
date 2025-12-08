@@ -9,7 +9,7 @@ load_dotenv()
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     stream=sys.stdout
 )
 
@@ -30,15 +30,15 @@ class Parser:
         return [initial_value] * count
 
     def create_places_dict(self, count, initial_value=None):
-        return {f'date_{i}': initial_value for i in range(count)}
+        return {f"date_{i}": initial_value for i in range(count)}
 
     def parse_website(self):
         try:
-            response = requests.get(self.url, self.headers)
+            response = requests.get(self.url, headers=self.headers)
             response.raise_for_status()
             page = BeautifulSoup(response.text, "html.parser")
-            dates_count = page.get_text().count('текущего года')
-            ps = page.find_all('p')
+            dates_count = page.get_text().count("текущего года")
+            ps = page.find_all("p")
             dates = self.create_date_list(dates_count)
             places_dict = self.create_places_dict(dates_count)
             date_index = 0
@@ -47,25 +47,25 @@ class Parser:
 
             for p in ps:
                 string = str(p.get_text())
-                if 'текущего года' in string:
+                if "текущего года" in string:
                     if first_iteration is True:
                         dates[date_index] = string
                         first_iteration = False
                         continue
-                    places_dict[f'date_{date_index}'] = places
+                    places_dict[f"date_{date_index}"] = places
                     date_index += 1
                     dates[date_index] = string
                     places = []
                     continue
                 places.append(string)
-            places_dict[f'date_{date_index}'] = places
+            places_dict[f"date_{date_index}"] = places
 
             results_list = []
             for i in range(dates_count):
-                for value in places_dict.get(f'date_{i}'):
+                for value in places_dict.get(f"date_{i}"):
                     for address in self.addresses:
                         if address.lower() in value.lower():
-                            results_list.append(f'{dates[i]}\n\n{value}')
+                            results_list.append(f"{dates[i]}\n\n{value}")
 
             if not results_list:
                 return "Нет информации об отключении электроэнергии " \

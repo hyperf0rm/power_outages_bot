@@ -24,7 +24,7 @@ bot = TeleBot(token=TOKEN)
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     stream=sys.stdout
 )
 
@@ -44,7 +44,8 @@ def check_env_vars():
 
     for var_name, var in env_variables.items():
         if not var:
-            logging.critical(f'Missing required environment variable: {var_name}. Bot stopped.')
+            logging.critical(
+                f"Missing required environment variable: {var_name}.")
             var_found = False
     return var_found
 
@@ -148,7 +149,7 @@ def show(message):
 
 
 @bot.message_handler(commands=["my"])
-def check(message):
+def my(message):
     user_id = message.chat.id
     logging.debug(f"Starting sending /my message to user {user_id}")
     cur = conn.cursor()
@@ -163,7 +164,7 @@ def check(message):
 
 
 @bot.message_handler(commands=["check"])
-def parse(message):
+def check(message):
     user_id = message.chat.id
     logging.debug(f"Starting sending /check message to user {user_id}")
     if message.text == "/check":
@@ -183,41 +184,48 @@ def msg(message):
 
 
 def main():
-    if not check_env_vars:
-        raise MissingEnvironmentVariableException("Missing required environment variable.")
+    if not check_env_vars():
+        raise MissingEnvironmentVariableException(
+            "Missing required environment variable.")
 
     while True:
         try:
-            cur = conn.cursor()
-            query = """SELECT user_id FROM light_bot.users;"""
-            cur.execute(query)
+            conn_bg = connect(
+                host=DB_HOST,
+                database=DB,
+                user=DB_USER,
+                password=DB_PASSWORD
+            )
+            cur = conn_bg.cursor()
+            cur.execute("SELECT user_id FROM light_bot.users;")
             user_ids = cur.fetchall()
             for user_id in user_ids:
-                print(user_id)
+                uid = user_id[0]
+                logging.info(f"user_id: {uid}")
                 query = """SELECT address FROM light_bot.addresses
                 WHERE user_id = %s;"""
-                cur.execute(query, (user_id[0],))
-                addresses = cur.fetchall()
-                list = [address[0] for address in addresses]
-                print(list)
-                parser = Parser(list)
+                cur.execute(query, (uid,))
+                addresses = [address[0] for address in cur.fetchall()]
+                logging.info(addresses)
+                parser = Parser(addresses)
                 result = parser.parse_website()
                 query = """SELECT last_message FROM light_bot.users
                 WHERE user_id = %s;"""
-                cur.execute(query, (user_id,))
+                cur.execute(query, (uid,))
                 last_msg = cur.fetchone()[0]
                 if result != last_msg:
-                    bot.send_message(user_id[0], result)
+                    bot.send_message(uid, result)
                     query = """UPDATE light_bot.users
                     SET last_message = %s
                     WHERE user_id = %s;"""
-                    cur.execute(query, (result, user_id[0]))
-                    conn.commit()
+                    cur.execute(query, (result, uid))
+                    conn_bg.commit()
         except Exception as error:
-            print(f'Error sending message: {error}')
+            logging.error(f"Main loop error: {error}")
 
         finally:
             cur.close()
+            conn_bg.close()
             time.sleep(RETRY_PERIOD)
 
 
