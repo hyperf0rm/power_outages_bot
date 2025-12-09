@@ -66,7 +66,7 @@ except Error as error:
 @bot.message_handler(commands=["start"])
 def start(message):
     user_id = message.chat.id
-    logging.debug(f"Starting sending /start message to user {user_id}")
+    logging.info(f"Starting sending /start message to user {user_id}")
     query = """INSERT INTO light_bot.users (user_id)
                VALUES (%s)
                ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
@@ -87,7 +87,7 @@ def start(message):
 @bot.message_handler(commands=["add"])
 def add(message):
     user_id = message.chat.id
-    logging.debug(f"Starting sending /add message to user {user_id}")
+    logging.info(f"Starting sending /add message to user {user_id}")
     if message.text == "/add":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -112,7 +112,7 @@ def add(message):
 @bot.message_handler(commands=["delete"])
 def delete(message):
     user_id = message.chat.id
-    logging.debug(f"Starting sending /delete message to user {user_id}")
+    logging.info(f"Starting sending /delete message to user {user_id}")
     if message.text == "/delete":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -134,7 +134,7 @@ def delete(message):
 @bot.message_handler(commands=["show"])
 def show(message):
     user_id = message.chat.id
-    logging.debug(f"Starting sending /show message to user {user_id}")
+    logging.info(f"Starting sending /show message to user {user_id}")
     cur = conn.cursor()
     query = """SELECT address FROM light_bot.addresses
                WHERE user_id = %s;"""
@@ -151,7 +151,7 @@ def show(message):
 @bot.message_handler(commands=["my"])
 def my(message):
     user_id = message.chat.id
-    logging.debug(f"Starting sending /my message to user {user_id}")
+    logging.info(f"Starting sending /my message to user {user_id}")
     cur = conn.cursor()
     query = """SELECT address FROM light_bot.addresses
                WHERE user_id = %s;"""
@@ -160,13 +160,23 @@ def my(message):
     list = [address[0] for address in addresses]
     parser = Parser(list)
     result = parser.parse_website()
+    query = """SELECT last_message FROM light_bot.users
+                WHERE user_id = %s;"""
+    cur.execute(query, (user_id,))
+    last_msg = cur.fetchone()[0]
+    if result != last_msg:
+        query = """UPDATE light_bot.users
+                   SET last_message = %s
+                   WHERE user_id = %s;"""
+        cur.execute(query, (result, user_id))
+        conn.commit()
     bot.send_message(user_id, result)
 
 
 @bot.message_handler(commands=["check"])
 def check(message):
     user_id = message.chat.id
-    logging.debug(f"Starting sending /check message to user {user_id}")
+    logging.info(f"Starting sending /check message to user {user_id}")
     if message.text == "/check":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -179,7 +189,7 @@ def check(message):
 @bot.message_handler()
 def msg(message):
     user_id = message.chat.id
-    logging.debug(f"Starting sending general message to user {user_id}")
+    logging.info(f"Starting sending general message to user {user_id}")
     bot.send_message(user_id, "Список доступных команд: /start")
 
 
@@ -201,12 +211,11 @@ def main():
             user_ids = cur.fetchall()
             for user_id in user_ids:
                 uid = user_id[0]
-                logging.info(f"user_id: {uid}")
                 query = """SELECT address FROM light_bot.addresses
                 WHERE user_id = %s;"""
                 cur.execute(query, (uid,))
                 addresses = [address[0] for address in cur.fetchall()]
-                logging.info(addresses)
+                logging.info(f"user_id: {uid}, addresses: {addresses}")
                 parser = Parser(addresses)
                 result = parser.parse_website()
                 query = """SELECT last_message FROM light_bot.users
@@ -214,6 +223,8 @@ def main():
                 cur.execute(query, (uid,))
                 last_msg = cur.fetchone()[0]
                 if result != last_msg:
+                    logging.info(
+                        f"Starting sending main message to user {uid}")
                     bot.send_message(uid, result)
                     query = """UPDATE light_bot.users
                     SET last_message = %s
