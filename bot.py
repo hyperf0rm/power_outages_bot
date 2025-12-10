@@ -8,6 +8,7 @@ import sys
 from exceptions import MissingEnvironmentVariableException
 import time
 import threading
+from contextlib import contextmanager
 
 load_dotenv()
 
@@ -197,6 +198,36 @@ def main():
     if not check_env_vars():
         raise MissingEnvironmentVariableException(
             "Missing required environment variable.")
+    
+    logging.info("Starting background check.")
+    parser = Parser()
+
+    while True:
+        try:
+            logging.info("Fetching data from website.")
+            outages = parser.get_all_outages()
+
+            if not outages:
+                logging.warning("No data fetched or empty site.")
+                time.sleep(RETRY_PERIOD)
+                continue
+            
+            conn_bg = connect(
+                host=DB_HOST,
+                database=DB,
+                user=DB_USER,
+                password=DB_PASSWORD
+            )
+            # get all users
+
+            cur = conn_bg.cursor()
+
+
+
+'''def main():
+    if not check_env_vars():
+        raise MissingEnvironmentVariableException(
+            "Missing required environment variable.")
 
     while True:
         try:
@@ -237,7 +268,7 @@ def main():
         finally:
             cur.close()
             conn_bg.close()
-            time.sleep(RETRY_PERIOD)
+            time.sleep(RETRY_PERIOD)'''
 
 
 thread = threading.Thread(target=main)
