@@ -157,22 +157,42 @@ def my(message):
     cur.execute(query, (user_id,))
     addresses = [address[0] for address in cur.fetchall()]
     parser = Parser()
-    outages = parser.parse_website()
 
+    outages = parser.parse_website()
     if not outages:
         logging.warning("No data fetched or empty site")
+
+    messages_for_user = []
+
+    for date, addresses_list in outages.items():
+        for addr in addresses_list:
+            for user_addr in addresses:
+                if user_addr.lower() in addr.lower():
+                    msg = f"{date}\n\n{addr}"
+                    if msg not in messages_for_user:
+                        messages_for_user.append(msg)
+
+    if not messages_for_user:
+        new_message = (
+            "Нет информации об отключениях электроэнергии "
+            "по вашим адресам в ближайшие дни")
+
+    else:
+        for i in range(len(messages_for_user)):
+            new_message = "\n\n".join(messages_for_user)
 
     query = """SELECT last_message FROM light_bot.users
                 WHERE user_id = %s;"""
     cur.execute(query, (user_id,))
     last_msg = cur.fetchone()[0]
-    if result != last_msg:
+
+    if new_message != last_msg:
         query = """UPDATE light_bot.users
                    SET last_message = %s
                    WHERE user_id = %s;"""
-        cur.execute(query, (result, user_id))
+        cur.execute(query, (new_message, user_id))
         conn.commit()
-    bot.send_message(user_id, result)
+    bot.send_message(user_id, new_message)
 
 
 @bot.message_handler(commands=["check"])
