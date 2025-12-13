@@ -28,11 +28,11 @@ class Parser:
 
     def create_places_dict(self, count, initial_value=None):
         return {f"date_{i}": initial_value for i in range(count)}
-    
+
     def parse_website(self):
         """
-        Скачивает сайт и возвращает словарь:
-        { "Дата отключения": ["Текст с адресами 1", "Текст с адресами 2"], ... }
+        Parses website and returns dict:
+        { "Date 1": ["Addresses 1", "Addresses 2"], ...}
         """
         try:
             response = requests.get(self.url, headers=self.headers, timeout=10)
@@ -58,7 +58,7 @@ class Parser:
 
                 else:
                     if current_date:
-                        current_places.append(text)
+                        current_places.append(text.removesuffix(","))
 
             if current_date:
                 outages[current_date] = current_places

@@ -8,7 +8,6 @@ import sys
 from exceptions import MissingEnvironmentVariableException
 import time
 import threading
-from contextlib import contextmanager
 
 load_dotenv()
 
@@ -46,7 +45,7 @@ def check_env_vars():
     for var_name, var in env_variables.items():
         if not var:
             logging.critical(
-                f"Missing required environment variable: {var_name}.")
+                f"Missing required environment variable: {var_name}")
             var_found = False
     return var_found
 
@@ -67,14 +66,14 @@ except Error as error:
 @bot.message_handler(commands=["start"])
 def start(message):
     user_id = message.chat.id
-    logging.info(f"Starting sending /start message to user {user_id}")
+    logging.info(f"Sending /start message to user {user_id}")
     query = """INSERT INTO light_bot.users (user_id)
                VALUES (%s)
                ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
     cursor = conn.cursor()
     cursor.execute(query, (user_id,))
     conn.commit()
-    # if cursor.rowcount == 1:
+
     bot_msg = """Что умеет этот бот:\n
     /add - добавить адрес\n
     /delete - удалить адрес\n
@@ -88,7 +87,7 @@ def start(message):
 @bot.message_handler(commands=["add"])
 def add(message):
     user_id = message.chat.id
-    logging.info(f"Starting sending /add message to user {user_id}")
+    logging.info(f"Sending /add message to user {user_id}")
     if message.text == "/add":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -113,7 +112,7 @@ def add(message):
 @bot.message_handler(commands=["delete"])
 def delete(message):
     user_id = message.chat.id
-    logging.info(f"Starting sending /delete message to user {user_id}")
+    logging.info(f"Sending /delete message to user {user_id}")
     if message.text == "/delete":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -135,15 +134,14 @@ def delete(message):
 @bot.message_handler(commands=["show"])
 def show(message):
     user_id = message.chat.id
-    logging.info(f"Starting sending /show message to user {user_id}")
+    logging.info(f"Sending /show message to user {user_id}")
     cur = conn.cursor()
     query = """SELECT address FROM light_bot.addresses
                WHERE user_id = %s;"""
     cur.execute(query, (user_id,))
-    addresses = cur.fetchall()
+    addresses = [address[0] for address in cur.fetchall()]
     if addresses:
-        list = [address[0] for address in addresses]
-        bot_msg = "Добавленные адреса:\n" + "\n".join(list)
+        bot_msg = "Добавленные адреса:\n\n" + "\n".join(addresses)
     else:
         bot_msg = "Вы не добавили ни один адрес"
     bot.send_message(user_id, bot_msg)
@@ -152,15 +150,18 @@ def show(message):
 @bot.message_handler(commands=["my"])
 def my(message):
     user_id = message.chat.id
-    logging.info(f"Starting sending /my message to user {user_id}")
+    logging.info(f"Sending /my message to user {user_id}")
     cur = conn.cursor()
     query = """SELECT address FROM light_bot.addresses
                WHERE user_id = %s;"""
     cur.execute(query, (user_id,))
-    addresses = cur.fetchall()
-    list = [address[0] for address in addresses]
-    parser = Parser(list)
-    result = parser.parse_website()
+    addresses = [address[0] for address in cur.fetchall()]
+    parser = Parser()
+    outages = parser.parse_website()
+
+    if not outages:
+        logging.warning("No data fetched or empty site")
+
     query = """SELECT last_message FROM light_bot.users
                 WHERE user_id = %s;"""
     cur.execute(query, (user_id,))
@@ -177,7 +178,7 @@ def my(message):
 @bot.message_handler(commands=["check"])
 def check(message):
     user_id = message.chat.id
-    logging.info(f"Starting sending /check message to user {user_id}")
+    logging.info(f"Sending /check message to user {user_id}")
     if message.text == "/check":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
@@ -190,89 +191,99 @@ def check(message):
 @bot.message_handler()
 def msg(message):
     user_id = message.chat.id
-    logging.info(f"Starting sending general message to user {user_id}")
+    logging.info(f"Sending general message to user {user_id}")
     bot.send_message(user_id, "Список доступных команд: /start")
 
 
 def main():
-    if not check_env_vars():
-        raise MissingEnvironmentVariableException(
-            "Missing required environment variable.")
-    
-    logging.info("Starting background check.")
+    logging.info("Starting background check")
     parser = Parser()
 
     while True:
         try:
-            logging.info("Fetching data from website.")
-            outages = parser.get_all_outages()
+            logging.info("Fetching data from website")
+            outages = parser.parse_website()
 
             if not outages:
-                logging.warning("No data fetched or empty site.")
+                logging.warning("No data fetched or empty site")
                 time.sleep(RETRY_PERIOD)
                 continue
-            
+
             conn_bg = connect(
                 host=DB_HOST,
                 database=DB,
                 user=DB_USER,
                 password=DB_PASSWORD
             )
-            # get all users
 
             cur = conn_bg.cursor()
+            query = """SELECT u.user_id, u.last_message, a.address
+                       FROM light_bot.users u
+                       JOIN light_bot.addresses a ON u.user_id = a.user_id"""
+            cur.execute(query)
+            users = cur.fetchall()
 
+            user_data = {}
 
+            for row in users:
+                uid, last_msg, address = row
+                if uid not in user_data:
+                    user_data[uid] = {"last_msg": last_msg, "addresses": []}
+                user_data[uid]["addresses"].append(address)
 
-'''def main():
-    if not check_env_vars():
-        raise MissingEnvironmentVariableException(
-            "Missing required environment variable.")
+            for user_id, data in user_data.items():
+                logging.info(f"Checking user {user_id} addresses")
+                user_addresses = data["addresses"]
+                last_message = data["last_msg"]
 
-    while True:
-        try:
-            conn_bg = connect(
-                host=DB_HOST,
-                database=DB,
-                user=DB_USER,
-                password=DB_PASSWORD
-            )
-            cur = conn_bg.cursor()
-            cur.execute("SELECT user_id FROM light_bot.users;")
-            user_ids = cur.fetchall()
-            for user_id in user_ids:
-                uid = user_id[0]
-                query = """SELECT address FROM light_bot.addresses
-                WHERE user_id = %s;"""
-                cur.execute(query, (uid,))
-                addresses = [address[0] for address in cur.fetchall()]
-                logging.info(f"user_id: {uid}, addresses: {addresses}")
-                parser = Parser(addresses)
-                result = parser.parse_website()
-                query = """SELECT last_message FROM light_bot.users
-                WHERE user_id = %s;"""
-                cur.execute(query, (uid,))
-                last_msg = cur.fetchone()[0]
-                if result != last_msg:
+                messages_for_user = []
+
+                for date, addresses_list in outages.items():
+                    for addr in addresses_list:
+                        for user_addr in user_addresses:
+                            if user_addr.lower() in addr.lower():
+                                msg = f"{date}\n\n{addr}"
+                                if msg not in messages_for_user:
+                                    messages_for_user.append(msg)
+
+                if not messages_for_user:
+                    new_message = (
+                        "Нет информации об отключениях электроэнергии "
+                        "по вашим адресам в ближайшие дни")
+
+                else:
+                    for i in range(len(messages_for_user)):
+                        new_message = "\n\n".join(messages_for_user)
+
+                if new_message != last_message:
                     logging.info(
-                        f"Starting sending main message to user {uid}")
-                    bot.send_message(uid, result)
+                        f"Starting sending main message to user {user_id}")
+                    cur = conn_bg.cursor()
                     query = """UPDATE light_bot.users
-                    SET last_message = %s
-                    WHERE user_id = %s;"""
-                    cur.execute(query, (result, uid))
+                               SET last_message = %s
+                               WHERE user_id = %s;"""
+                    cur.execute(query, (new_message, user_id))
                     conn_bg.commit()
+                    bot.send_message(user_id, new_message)
+
         except Exception as error:
             logging.error(f"Main loop error: {error}")
 
         finally:
             cur.close()
             conn_bg.close()
-            time.sleep(RETRY_PERIOD)'''
+            time.sleep(RETRY_PERIOD)
 
 
-thread = threading.Thread(target=main)
-thread.daemon = True
-thread.start()
+if __name__ == "__main__":
 
-bot.infinity_polling()
+    if not check_env_vars():
+        raise MissingEnvironmentVariableException(
+            "Missing required environment variable")
+
+    thread = threading.Thread(target=main)
+    thread.daemon = True
+    thread.start()
+
+    logging.info("Starting bot polling")
+    bot.infinity_polling()
