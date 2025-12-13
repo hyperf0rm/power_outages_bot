@@ -63,24 +63,30 @@ except Error as error:
     logging.critical(f"Error connecting to PostgreSQL: {error}")
 
 
-@bot.message_handler(commands=["start"])
+@bot.message_handler(commands=["start", "info"])
 def start(message):
     user_id = message.chat.id
-    logging.info(f"Sending /start message to user {user_id}")
-    query = """INSERT INTO light_bot.users (user_id)
-               VALUES (%s)
-               ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
-    cursor = conn.cursor()
-    cursor.execute(query, (user_id,))
-    conn.commit()
+
+    if message.text.startswith("/start"):
+        logging.info(f"Sending /start message to user {user_id}")
+        query = """INSERT INTO light_bot.users (user_id)
+                   VALUES (%s)
+                   ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
+        cursor = conn.cursor()
+        cursor.execute(query, (user_id,))
+        conn.commit()
+
+    if message.text.startswith("/info"):
+        logging.info(f"Sending /info message to user {user_id}")
 
     bot_msg = """Что умеет этот бот:\n
-    /add - добавить адрес\n
-    /delete - удалить адрес\n
-    /show - показать ваши добавленные адреса\n
-    /my - проверить отключения по вашим адресам\n
-    /check - проверить конкретный адрес\n
-    /start - информация об этом боте"""
+/add - добавить адрес. В формате: /add Бабаяна
+/delete - удалить адрес.  В формате: /delete Бабаяна
+/check - проверить конкретный адрес. В формате: /check Бабаяна
+/show - показать ваши добавленные адреса
+/my - проверить отключения по вашим адресам
+/info - информация об этом боте"""
+
     bot.send_message(user_id, bot_msg)
 
 
