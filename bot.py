@@ -2,7 +2,7 @@ from telebot import TeleBot
 from dotenv import load_dotenv
 import os
 from parser import Parser
-from psycopg2 import connect, Error
+from psycopg2 import connect, Error, pool
 import logging
 import sys
 from exceptions import MissingEnvironmentVariableException
@@ -16,7 +16,7 @@ TOKEN = os.getenv("TOKEN")
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
 DB_HOST = os.getenv("DB_HOST")
-DB = os.getenv("DATABASE")
+DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
@@ -29,13 +29,29 @@ logging.basicConfig(
 )
 
 
+try:
+    db_pool = pool.ThreadedConnectionPool(
+        minconn=1,
+        maxconn=10,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST
+    )
+    if db_pool:
+        logging.info("Connection pool created succesfully")
+except Exception as error:
+    logging.critical(f"Error creating a connection pool: {error}")
+    sys.exit(1)
+
+
 def check_env_vars():
     """Check environment variables existence."""
     env_variables = {
         "TELEGRAM_TOKEN": TOKEN,
         "RETRY_PERIOD": RETRY_PERIOD,
         "DB_HOST": DB_HOST,
-        "DATABASE": DB,
+        "DATABASE": DB_NAME,
         "DB_USER": DB_USER,
         "DB_PASSWORD": DB_PASSWORD
     }
@@ -54,7 +70,7 @@ try:
     logging.debug("Starting connecting to the database")
     conn = connect(
         host=DB_HOST,
-        database=DB,
+        database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD
     )
@@ -237,7 +253,7 @@ def main():
 
             conn_bg = connect(
                 host=DB_HOST,
-                database=DB,
+                database=DB_NAME,
                 user=DB_USER,
                 password=DB_PASSWORD
             )
