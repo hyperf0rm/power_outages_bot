@@ -2,13 +2,14 @@ from telebot import TeleBot
 from dotenv import load_dotenv
 import os
 from parser import Parser
-from psycopg2 import connect, Error, pool
+from psycopg2 import connect, pool
 import logging
 import sys
 from exceptions import MissingEnvironmentVariableException
 import time
 import threading
 from utils import check_env_vars
+from contextlib import contextmanager
 
 load_dotenv()
 
@@ -31,7 +32,7 @@ logging.basicConfig(
 try:
     db_pool = pool.ThreadedConnectionPool(
         minconn=1,
-        maxconn=10,
+        maxconn=3,
         database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
@@ -43,7 +44,7 @@ except Exception as error:
     logging.critical(f"Error creating a connection pool: {error}")
     sys.exit(1)
 
-try:
+'''try:
     logging.debug("Starting connecting to the database")
     conn = connect(
         host=DB_HOST,
@@ -53,25 +54,25 @@ try:
     )
     logging.debug("Connected to PostgreSQL successfully!")
 except Error as error:
-    logging.critical(f"Error connecting to PostgreSQL: {error}")
+    logging.critical(f"Error connecting to PostgreSQL: {error}")'''
+
+@contextmanager
+def get_db_cursor():
+    conn = db_pool.getconn()
+    try:
+        yield conn.cursor()
+        conn.commit()
+    except Exception as error:
+        logging.error(f"Error in connection pool: {error}")
+        conn.rollback()
+        raise error
+    finally:
+        db_pool.putconn(conn)
 
 
 @bot.message_handler(commands=["start", "info"])
 def start(message):
     user_id = message.chat.id
-
-    if message.text.startswith("/start"):
-        logging.info(f"Sending /start message to user {user_id}")
-        query = """INSERT INTO light_bot.users (user_id)
-                   VALUES (%s)
-                   ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
-        cursor = conn.cursor()
-        cursor.execute(query, (user_id,))
-        conn.commit()
-
-    if message.text.startswith("/info"):
-        logging.info(f"Sending /info message to user {user_id}")
-
     bot_msg = """Что умеет этот бот:\n
 /add - добавить адрес. В формате: /add Бабаяна
 /delete - удалить адрес.  В формате: /delete Бабаяна
@@ -80,7 +81,23 @@ def start(message):
 /my - проверить отключения по вашим адресам
 /info - информация об этом боте"""
 
-    bot.send_message(user_id, bot_msg)
+    try:
+        if message.text.startswith("/start"):
+
+            logging.info(f"Sending /start message to user {user_id}")
+            query = """INSERT INTO light_bot.users (user_id)
+                       VALUES (%s)
+                       ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
+            with get_db_cursor() as cur:
+                cur.execute(query, (user_id,))
+
+        if message.text.startswith("/info"):
+            logging.info(f"Sending /info message to user {user_id}")
+
+        bot.send_message(user_id, bot_msg)
+    except Exception as error:
+        logging.error(f"Error: {error}")
+        bot.send_message(user_id, "Ошибка. Попробуйте снова")
 
 
 @bot.message_handler(commands=["add"])
