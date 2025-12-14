@@ -2,7 +2,7 @@ from telebot import TeleBot
 from dotenv import load_dotenv
 import os
 from parser import Parser
-from psycopg2 import connect, pool
+from psycopg2 import pool
 import logging
 import sys
 from exceptions import MissingEnvironmentVariableException
@@ -32,7 +32,7 @@ logging.basicConfig(
 try:
     db_pool = pool.ThreadedConnectionPool(
         minconn=1,
-        maxconn=3,
+        maxconn=10,
         database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
@@ -44,17 +44,6 @@ except Exception as error:
     logging.critical(f"Error creating a connection pool: {error}")
     sys.exit(1)
 
-'''try:
-    logging.debug("Starting connecting to the database")
-    conn = connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD
-    )
-    logging.debug("Connected to PostgreSQL successfully!")
-except Error as error:
-    logging.critical(f"Error connecting to PostgreSQL: {error}")'''
 
 @contextmanager
 def get_db_cursor():
@@ -85,11 +74,13 @@ def start(message):
         if message.text.startswith("/start"):
 
             logging.info(f"Sending /start message to user {user_id}")
-            query = """INSERT INTO light_bot.users (user_id)
-                       VALUES (%s)
-                       ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;"""
             with get_db_cursor() as cur:
-                cur.execute(query, (user_id,))
+                cur.execute(
+                    """INSERT INTO light_bot.users (user_id)
+                    VALUES (%s)
+                    ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;""",
+                    (user_id,)
+                )
 
         if message.text.startswith("/info"):
             logging.info(f"Sending /info message to user {user_id}")
@@ -104,135 +95,197 @@ def start(message):
 def add(message):
     user_id = message.chat.id
     logging.info(f"Sending /add message to user {user_id}")
+
     if message.text == "/add":
-        bot.send_message(user_id, "Добавьте адрес вместе с командой")
+        bot.send_message(user_id, "Укажите адрес, например: /add Бабаяна")
         return
+
     address = message.text.replace("/add ", "")
-    cursor = conn.cursor()
-    cursor.execute("""SELECT EXISTS
-                   (SELECT 1 FROM light_bot.addresses
-                   WHERE user_id = %s AND address = %s);""",
-                   (user_id, address))
-    exists = cursor.fetchone()[0]
-    if exists:
-        bot_msg = f"Адрес {address} уже добавлен"
-    else:
-        query = """INSERT INTO light_bot.addresses (user_id, address)
-                   VALUES (%s, %s);"""
-        cursor.execute(query, (user_id, address))
-        conn.commit()
-        bot_msg = f"Добавлен адрес: {address}"
-    bot.send_message(user_id, bot_msg)
+    try:
+        with get_db_cursor() as cur:
+            cur.execute(
+                """SELECT EXISTS
+                (SELECT 1 FROM light_bot.addresses
+                WHERE user_id = %s AND address = %s);""",
+                (user_id, address)
+            )
+            if cur.fetchone()[0]:
+                bot_msg = f"Адрес {address} уже добавлен"
+            else:
+                cur.execute(
+                    """INSERT INTO light_bot.addresses (user_id, address)
+                    VALUES (%s, %s);""",
+                    (user_id, address)
+                )
+                bot_msg = f"Добавлен адрес: {address}"
+        bot.send_message(user_id, bot_msg)
+    except Exception as error:
+        logging.error(f"Error: {error}")
+        bot.send_message(user_id, "Ошибка. Попробуйте снова")
 
 
 @bot.message_handler(commands=["delete"])
 def delete(message):
     user_id = message.chat.id
     logging.info(f"Sending /delete message to user {user_id}")
+
     if message.text == "/delete":
-        bot.send_message(user_id, "Добавьте адрес вместе с командой")
+        bot.send_message(user_id, "Укажите адрес, например: /delete Бабаяна")
         return
+
     address = message.text.replace("/delete ", "")
-    cursor = conn.cursor()
-    cursor.execute("""DELETE FROM light_bot.addresses
-                   WHERE user_id = %s and address = %s
-                   RETURNING id;""",
-                   (user_id, address))
-    exists = cursor.fetchall()
-    conn.commit()
-    if exists:
-        bot_msg = f"Удален адрес: {address}"
-    else:
-        bot_msg = "Этот адрес не был вами добавлен"
-    bot.send_message(user_id, bot_msg)
+    try:
+        with get_db_cursor() as cur:
+            cur.execute(
+                """DELETE FROM light_bot.addresses
+                WHERE user_id = %s and address = %s
+                RETURNING id;""",
+                (user_id, address)
+            )
+            if cur.fetchall():
+                bot_msg = f"Удален адрес: {address}"
+            else:
+                bot_msg = "Этот адрес не был вами добавлен"
+        bot.send_message(user_id, bot_msg)
+    except Exception as error:
+        logging.error(f"Error: {error}")
+        bot.send_message(user_id, "Ошибка. Попробуйте снова")
 
 
 @bot.message_handler(commands=["show"])
 def show(message):
     user_id = message.chat.id
     logging.info(f"Sending /show message to user {user_id}")
-    cur = conn.cursor()
-    query = """SELECT address FROM light_bot.addresses
-               WHERE user_id = %s;"""
-    cur.execute(query, (user_id,))
-    addresses = [address[0] for address in cur.fetchall()]
-    if addresses:
-        bot_msg = "Добавленные адреса:\n\n" + "\n".join(addresses)
-    else:
-        bot_msg = "Вы не добавили ни один адрес"
-    bot.send_message(user_id, bot_msg)
+
+    try:
+        with get_db_cursor() as cur:
+            cur.execute(
+                """SELECT address FROM light_bot.addresses
+                WHERE user_id = %s;""",
+                (user_id,)
+            )
+            addresses = [address[0] for address in cur.fetchall()]
+            if addresses:
+                bot_msg = "Добавленные адреса:\n\n" + "\n".join(addresses)
+            else:
+                bot_msg = "Вы не добавили ни один адрес"
+        bot.send_message(user_id, bot_msg)
+    except Exception as error:
+        logging.error(f"Error: {error}")
+        bot.send_message(user_id, "Ошибка. Попробуйте снова")
 
 
 @bot.message_handler(commands=["my"])
 def my(message):
     user_id = message.chat.id
     logging.info(f"Sending /my message to user {user_id}")
-    cur = conn.cursor()
-    query = """SELECT address FROM light_bot.addresses
-               WHERE user_id = %s;"""
-    cur.execute(query, (user_id,))
-    addresses = [address[0] for address in cur.fetchall()]
-    parser = Parser()
 
-    outages = parser.parse_website()
-    if not outages:
-        logging.warning("No data fetched or empty site")
+    try:
+        with get_db_cursor() as cur:
+            cur.execute(
+                """SELECT address FROM light_bot.addresses
+                WHERE user_id = %s;""",
+                (user_id,)
+            )
+            addresses = [address[0] for address in cur.fetchall()]
+            parser = Parser()
+            outages = parser.parse_website()
+            if not outages:
+                logging.warning("No data fetched or empty site")
 
-    messages_for_user = []
+            messages_for_user = []
 
-    for date, addresses_list in outages.items():
-        for addr in addresses_list:
-            for user_addr in addresses:
-                if user_addr.lower() in addr.lower():
-                    msg = f"{date}\n\n{addr}"
-                    if msg not in messages_for_user:
-                        messages_for_user.append(msg)
+            for date, addresses_list in outages.items():
+                for addr in addresses_list:
+                    for user_addr in addresses:
+                        if user_addr.lower() in addr.lower():
+                            msg = f"{date}\n\n{addr}"
+                            if msg not in messages_for_user:
+                                messages_for_user.append(msg)
 
-    if not messages_for_user:
-        new_message = (
-            "Нет информации об отключениях электроэнергии "
-            "по вашим адресам в ближайшие дни")
+            if not messages_for_user:
+                new_message = (
+                    "Нет информации об отключениях электроэнергии "
+                    "по вашим адресам в ближайшие дни"
+                )
 
-    else:
-        for i in range(len(messages_for_user)):
-            new_message = "\n\n".join(messages_for_user)
+            else:
+                for i in range(len(messages_for_user)):
+                    new_message = "\n\n".join(messages_for_user)
 
-    query = """SELECT last_message FROM light_bot.users
-                WHERE user_id = %s;"""
-    cur.execute(query, (user_id,))
-    last_msg = cur.fetchone()[0]
+            cur.execute(
+                """SELECT last_message FROM light_bot.users
+                WHERE user_id = %s;""",
+                (user_id,)
+            )
+            last_msg = cur.fetchone()[0]
 
-    if new_message != last_msg:
-        query = """UPDATE light_bot.users
-                   SET last_message = %s
-                   WHERE user_id = %s;"""
-        cur.execute(query, (new_message, user_id))
-        conn.commit()
-    bot.send_message(user_id, new_message)
+            if new_message != last_msg:
+                cur.execute(
+                    """UPDATE light_bot.users
+                    SET last_message = %s
+                    WHERE user_id = %s;""",
+                    (new_message, user_id)
+                )
+        bot.send_message(user_id, new_message)
+    except Exception as error:
+        logging.error(f"Error: {error}")
+        bot.send_message(user_id, "Ошибка. Попробуйте снова")
 
 
 @bot.message_handler(commands=["check"])
 def check(message):
     user_id = message.chat.id
     logging.info(f"Sending /check message to user {user_id}")
+
     if message.text == "/check":
         bot.send_message(user_id, "Добавьте адрес вместе с командой")
         return
-    address = message.text.replace("/check ", "")
-    parser = Parser([address])
-    result = parser.parse_website()
-    bot.send_message(user_id, result)
+
+    user_address = message.text.replace("/check ", "")
+    try:
+        parser = Parser()
+        outages = parser.parse_website()
+        if not outages:
+            logging.warning("No data fetched or empty site")
+
+        messages_for_user = []
+
+        for date, addresses_list in outages.items():
+            for addr in addresses_list:
+                if user_address.lower() in addr.lower():
+                    msg = f"{date}\n\n{addr}"
+                    if msg not in messages_for_user:
+                        messages_for_user.append(msg)
+
+            if not messages_for_user:
+                message = (
+                    "Нет информации об отключениях электроэнергии "
+                    "по вашим адресам в ближайшие дни"
+                )
+
+            else:
+                for i in range(len(messages_for_user)):
+                    message = "\n\n".join(messages_for_user)
+
+        bot.send_message(user_id, message)
+    except Exception as error:
+        logging.error(f"Error: {error}")
+        bot.send_message(user_id, "Ошибка. Попробуйте снова")
 
 
 @bot.message_handler()
 def msg(message):
     user_id = message.chat.id
     logging.info(f"Sending general message to user {user_id}")
-    bot.send_message(user_id, "Список доступных команд: /start")
+    try:
+        bot.send_message(user_id, "Список доступных команд: /info")
+    except Exception as error:
+        logging.error(f"Error: {error}")
 
 
 def main():
-    logging.info("Starting background check")
+    logging.info("Starting background job")
     parser = Parser()
 
     while True:
@@ -245,19 +298,13 @@ def main():
                 time.sleep(RETRY_PERIOD)
                 continue
 
-            conn_bg = connect(
-                host=DB_HOST,
-                database=DB_NAME,
-                user=DB_USER,
-                password=DB_PASSWORD
-            )
-
-            cur = conn_bg.cursor()
-            query = """SELECT u.user_id, u.last_message, a.address
-                       FROM light_bot.users u
-                       JOIN light_bot.addresses a ON u.user_id = a.user_id"""
-            cur.execute(query)
-            users = cur.fetchall()
+            with get_db_cursor() as cur:
+                cur.execute(
+                    """SELECT u.user_id, u.last_message, a.address
+                    FROM light_bot.users u
+                    JOIN light_bot.addresses a ON u.user_id = a.user_id"""
+                )
+                users = cur.fetchall()
 
             user_data = {}
 
@@ -285,7 +332,8 @@ def main():
                 if not messages_for_user:
                     new_message = (
                         "Нет информации об отключениях электроэнергии "
-                        "по вашим адресам в ближайшие дни")
+                        "по вашим адресам в ближайшие дни"
+                    )
 
                 else:
                     for i in range(len(messages_for_user)):
@@ -293,21 +341,24 @@ def main():
 
                 if new_message != last_message:
                     logging.info(
-                        f"Starting sending main message to user {user_id}")
-                    cur = conn_bg.cursor()
-                    query = """UPDATE light_bot.users
-                               SET last_message = %s
-                               WHERE user_id = %s;"""
-                    cur.execute(query, (new_message, user_id))
-                    conn_bg.commit()
-                    bot.send_message(user_id, new_message)
+                        f"Starting sending main message to user {user_id}"
+                    )
+                    try:
+                        with get_db_cursor() as cur:
+                            cur.execute(
+                                """UPDATE light_bot.users
+                                SET last_message = %s
+                                WHERE user_id = %s;""",
+                                (new_message, user_id)
+                            )
+                        bot.send_message(user_id, new_message)
+                    except Exception as error:
+                        logging.error(f"Error: {error}")
 
         except Exception as error:
-            logging.error(f"Main loop error: {error}")
+            logging.error(f"Background job error: {error}")
 
         finally:
-            cur.close()
-            conn_bg.close()
             time.sleep(RETRY_PERIOD)
 
 
