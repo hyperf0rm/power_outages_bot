@@ -8,17 +8,17 @@ import sys
 from exceptions import MissingEnvironmentVariableException
 import time
 import threading
+from utils import check_env_vars
 
 load_dotenv()
-
-TOKEN = os.getenv("TOKEN")
-
-RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+TOKEN = os.getenv("TOKEN")
+RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
 bot = TeleBot(token=TOKEN)
 
@@ -27,7 +27,6 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     stream=sys.stdout
 )
-
 
 try:
     db_pool = pool.ThreadedConnectionPool(
@@ -43,28 +42,6 @@ try:
 except Exception as error:
     logging.critical(f"Error creating a connection pool: {error}")
     sys.exit(1)
-
-
-def check_env_vars():
-    """Check environment variables existence."""
-    env_variables = {
-        "TELEGRAM_TOKEN": TOKEN,
-        "RETRY_PERIOD": RETRY_PERIOD,
-        "DB_HOST": DB_HOST,
-        "DATABASE": DB_NAME,
-        "DB_USER": DB_USER,
-        "DB_PASSWORD": DB_PASSWORD
-    }
-
-    var_found = True
-
-    for var_name, var in env_variables.items():
-        if not var:
-            logging.critical(
-                f"Missing required environment variable: {var_name}")
-            var_found = False
-    return var_found
-
 
 try:
     logging.debug("Starting connecting to the database")
