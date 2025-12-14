@@ -15,16 +15,13 @@ logging.basicConfig(
 
 
 class Parser:
-    url = os.getenv("URL")
-    accept = os.getenv("ACCEPT")
-    user_agent = os.getenv("USER_AGENT")
-    headers = {
-        "Accept": accept,
-        "User-Agent": user_agent
-    }
 
-    def __init__(self, addresses):
-        self.addresses = addresses
+    def __init__(self):
+        self.url = os.getenv("URL")
+        self.headers = {
+            "Accept": os.getenv("ACCEPT"),
+            "User-Agent": os.getenv("USER_AGENT")
+        }
 
     def create_date_list(self, count, initial_value=None):
         return [initial_value] * count
@@ -33,47 +30,41 @@ class Parser:
         return {f"date_{i}": initial_value for i in range(count)}
 
     def parse_website(self):
+        """
+        Parses website and returns dict:
+        { "Date 1": ["Addresses 1", "Addresses 2"], ...}
+        """
         try:
-            response = requests.get(self.url, headers=self.headers)
+            response = requests.get(self.url, headers=self.headers, timeout=10)
             response.raise_for_status()
+
             page = BeautifulSoup(response.text, "html.parser")
-            dates_count = page.get_text().count("текущего года")
-            ps = page.find_all("p")
-            dates = self.create_date_list(dates_count)
-            places_dict = self.create_places_dict(dates_count)
-            date_index = 0
-            first_iteration = True
-            places = []
+            ps = [p.get_text() for p in page.find_all("p")]
 
-            for p in ps:
-                string = str(p.get_text())
-                if "текущего года" in string:
-                    if first_iteration is True:
-                        dates[date_index] = string
-                        first_iteration = False
-                        continue
-                    places_dict[f"date_{date_index}"] = places
-                    date_index += 1
-                    dates[date_index] = string
-                    places = []
+            outages = {}
+            current_date = None
+            current_places = []
+
+            for text in ps:
+                if not text:
                     continue
-                places.append(string)
-            places_dict[f"date_{date_index}"] = places
 
-            results_list = []
-            for i in range(dates_count):
-                for value in places_dict.get(f"date_{i}"):
-                    for address in self.addresses:
-                        if address.lower() in value.lower():
-                            results_list.append(f"{dates[i]}\n\n{value}")
+                if "текущего года" in text:
+                    if current_date:
+                        outages[current_date] = current_places
 
-            if not results_list:
-                return "Нет информации об отключении электроэнергии " \
-                        "по вашим адресам в ближайшие дни"
-            else:
-                for i in range(len(results_list)):
-                    result = "\n\n".join(results_list)
-                    return result
+                    current_date = text
+                    current_places = []
+
+                else:
+                    if current_date:
+                        current_places.append(text.removesuffix(","))
+
+            if current_date:
+                outages[current_date] = current_places
+
+            return outages
+
         except requests.exceptions.HTTPError as error:
             logging.error(f"HTTP Error: {error}")
             logging.error(f"Response content: {error.response.text}")
