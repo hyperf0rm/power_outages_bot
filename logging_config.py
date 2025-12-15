@@ -1,5 +1,6 @@
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 
 
 def setup_logging():
@@ -14,7 +15,7 @@ def setup_logging():
 
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
-    file_handler = logging.RotatingFileHandler(
+    file_handler = RotatingFileHandler(
         LOG_FILE_PATH,
         maxBytes=MAX_FILE_SIZE,
         backupCount=BACKUP_COUNT,
