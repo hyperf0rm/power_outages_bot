@@ -2,16 +2,14 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
-import sys
 import logging
+from utils import branch_is_main
+import logging_config
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    stream=sys.stdout
-)
+if branch_is_main():
+    logger = logging_config.setup_logging()
 
 
 class Parser:
