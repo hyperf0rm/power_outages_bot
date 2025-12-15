@@ -99,6 +99,8 @@ def start(message):
                     ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;""",
                     (user_id,)
                 )
+                if cur.rowcount == 1:
+                    logging.info(f"User {user_id} activated the bot")
 
         if message.text.startswith("/info"):
             logging.info(f"Sending /info message to user {user_id}")
@@ -136,6 +138,7 @@ def add(message):
                     (user_id, address)
                 )
                 bot_msg = f"Добавлен адрес: {address}"
+                logging.info(f"User {user_id} added address {address}")
         bot.send_message(user_id, bot_msg)
     except Exception as error:
         logging.error(f"Error: {error}")
@@ -162,6 +165,7 @@ def delete(message):
             )
             if cur.fetchall():
                 bot_msg = f"Удален адрес: {address}"
+                logging.info(f"User {user_id} deleted address {address}")
             else:
                 bot_msg = "Этот адрес не был вами добавлен"
         bot.send_message(user_id, bot_msg)
@@ -245,6 +249,7 @@ def my(message):
                     WHERE user_id = %s;""",
                     (new_message, user_id)
                 )
+                logging.info(f"Updated last message for user {user_id}")
         bot.send_message(user_id, new_message)
     except Exception as error:
         logging.error(f"Error: {error}")
@@ -370,6 +375,8 @@ def main():
                                 WHERE user_id = %s;""",
                                 (new_message, user_id)
                             )
+                            logging.info(
+                                f"Updated last message for user {user_id}")
                         bot.send_message(user_id, new_message)
                     except Exception as error:
                         logging.error(f"Error: {error}")
