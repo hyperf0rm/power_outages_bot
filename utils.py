@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 import sys
 import git
+import hashlib
 
 load_dotenv()
 
@@ -64,3 +65,7 @@ def check_env_vars():
                 f"Missing required environment variable: {var_name}")
             var_found = False
     return var_found
+
+
+def generate_last_message_hash(message):
+    return hashlib.md5(message.encode("utf-8")).hexdigest()

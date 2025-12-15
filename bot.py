@@ -8,7 +8,7 @@ import sys
 from exceptions import MissingEnvironmentVariableException
 import time
 import threading
-from utils import check_env_vars, branch_is_main
+from utils import check_env_vars, branch_is_main, generate_last_message_hash
 from contextlib import contextmanager
 import logging_config
 
@@ -90,14 +90,14 @@ def start(message):
 
     try:
         if message.text.startswith("/start"):
-
+            username = message.from_user.username
             logging.info(f"Sending /start message to user {user_id}")
             with get_db_cursor() as cur:
                 cur.execute(
-                    """INSERT INTO light_bot.users (user_id)
-                    VALUES (%s)
+                    """INSERT INTO light_bot.users (user_id, username)
+                    VALUES (%s, %s)
                     ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;""",
-                    (user_id,)
+                    (user_id, username)
                 )
                 if cur.rowcount == 1:
                     logging.info(f"User {user_id} activated the bot")
@@ -235,19 +235,20 @@ def my(message):
                 for i in range(len(messages_for_user)):
                     new_message = "\n\n".join(messages_for_user)
 
+            new_message_hash = generate_last_message_hash(new_message)
             cur.execute(
-                """SELECT last_message FROM light_bot.users
+                """SELECT last_message_hash FROM light_bot.users
                 WHERE user_id = %s;""",
                 (user_id,)
             )
-            last_msg = cur.fetchone()[0]
+            last_msg_hash = cur.fetchone()[0]
 
-            if new_message != last_msg:
+            if new_message_hash != last_msg_hash:
                 cur.execute(
                     """UPDATE light_bot.users
-                    SET last_message = %s
+                    SET last_message_hash = %s
                     WHERE user_id = %s;""",
-                    (new_message, user_id)
+                    (new_message_hash, user_id)
                 )
                 logging.info(f"Updated last message for user {user_id}")
         bot.send_message(user_id, new_message)
@@ -323,7 +324,7 @@ def main():
 
             with get_db_cursor() as cur:
                 cur.execute(
-                    """SELECT u.user_id, u.last_message, a.address
+                    """SELECT u.user_id, u.last_message_hash, a.address
                     FROM light_bot.users u
                     JOIN light_bot.addresses a ON u.user_id = a.user_id
                     WHERE u.blocked_at IS NULL"""
@@ -333,15 +334,18 @@ def main():
             user_data = {}
 
             for row in users:
-                uid, last_msg, address = row
+                uid, last_msg_hash, address = row
                 if uid not in user_data:
-                    user_data[uid] = {"last_msg": last_msg, "addresses": []}
+                    user_data[uid] = {
+                        "last_msg_hash": last_msg_hash,
+                        "addresses": []
+                    }
                 user_data[uid]["addresses"].append(address)
 
             for user_id, data in user_data.items():
                 logging.info(f"Checking user {user_id} addresses")
                 user_addresses = data["addresses"]
-                last_message = data["last_msg"]
+                last_message_hash = data["last_msg_hash"]
 
                 messages_for_user = []
 
@@ -363,7 +367,9 @@ def main():
                     for i in range(len(messages_for_user)):
                         new_message = "\n\n".join(messages_for_user)
 
-                if new_message != last_message:
+                new_message_hash = generate_last_message_hash(new_message)
+
+                if new_message_hash != last_message_hash:
                     logging.info(
                         f"Starting sending main message to user {user_id}"
                     )
@@ -371,9 +377,9 @@ def main():
                         with get_db_cursor() as cur:
                             cur.execute(
                                 """UPDATE light_bot.users
-                                SET last_message = %s
+                                SET last_message_hash = %s
                                 WHERE user_id = %s;""",
-                                (new_message, user_id)
+                                (new_message_hash, user_id)
                             )
                             logging.info(
                                 f"Updated last message for user {user_id}")
