@@ -10,6 +10,7 @@ import time
 import threading
 from utils import check_env_vars, branch_is_main
 from contextlib import contextmanager
+import logging_config
 
 load_dotenv()
 
@@ -24,17 +25,12 @@ RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 if branch_is_main():
     TOKEN = os.getenv("TOKEN_PROD")
     DB_NAME = os.getenv("DB_NAME")
+    logger = logging_config.setup_logging()
 else:
     TOKEN = os.getenv("TOKEN_DEV")
     DB_NAME = os.getenv("DB_NAME_DEV")
 
 bot = TeleBot(token=TOKEN)
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    stream=sys.stdout
-)
 
 try:
     db_pool = pool.ThreadedConnectionPool(
