@@ -15,6 +15,7 @@ def setup_logging():
 
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
+    root_logger.propagate = False
     file_handler = RotatingFileHandler(
         LOG_FILE_PATH,
         maxBytes=MAX_FILE_SIZE,
