@@ -14,12 +14,19 @@ from contextlib import contextmanager
 load_dotenv()
 
 DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
+
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 TOKEN = os.getenv("TOKEN_PROD")
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
+
+if branch_is_main():
+    TOKEN = os.getenv("TOKEN_PROD")
+    DB_NAME = os.getenv("DB_NAME")
+else:
+    TOKEN = os.getenv("TOKEN_DEV")
+    DB_NAME = os.getenv("DB_NAME_DEV")
 
 bot = TeleBot(token=TOKEN)
 
@@ -397,8 +404,6 @@ if __name__ == "__main__":
     if not check_env_vars():
         raise MissingEnvironmentVariableException(
             "Missing required environment variable")
-    
-    print(branch_is_main())
 
     thread = threading.Thread(target=main)
     thread.daemon = True
