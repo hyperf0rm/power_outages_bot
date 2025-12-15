@@ -99,7 +99,7 @@ def start(message):
                     ON CONFLICT ON CONSTRAINT user_id_unique DO NOTHING;""",
                     (user_id,)
                 )
-                if cur.fetchall():
+                if cur.rowcount == 1:
                     logging.info(f"User {user_id} activated the bot")
 
         if message.text.startswith("/info"):
