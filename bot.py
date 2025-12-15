@@ -8,18 +8,25 @@ import sys
 from exceptions import MissingEnvironmentVariableException
 import time
 import threading
-from utils import check_env_vars
+from utils import check_env_vars, branch_is_main
 from contextlib import contextmanager
 
 load_dotenv()
 
 DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
+
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.getenv("TOKEN_PROD")
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
+
+if branch_is_main():
+    TOKEN = os.getenv("TOKEN_PROD")
+    DB_NAME = os.getenv("DB_NAME")
+else:
+    TOKEN = os.getenv("TOKEN_DEV")
+    DB_NAME = os.getenv("DB_NAME_DEV")
 
 bot = TeleBot(token=TOKEN)
 
@@ -52,7 +59,7 @@ def get_db_cursor():
         yield conn.cursor()
         conn.commit()
     except Exception as error:
-        logging.error(f"Error in connection pool: {error}")
+        logging.error(f"Database error: {error}")
         conn.rollback()
         raise error
     finally:
@@ -302,7 +309,8 @@ def main():
                 cur.execute(
                     """SELECT u.user_id, u.last_message, a.address
                     FROM light_bot.users u
-                    JOIN light_bot.addresses a ON u.user_id = a.user_id"""
+                    JOIN light_bot.addresses a ON u.user_id = a.user_id
+                    WHERE u.blocked_at IS NULL"""
                 )
                 users = cur.fetchall()
 
@@ -360,6 +368,35 @@ def main():
 
         finally:
             time.sleep(RETRY_PERIOD)
+
+
+@bot.my_chat_member_handler()
+def handle_user_status(update):
+    new_status = update.new_chat_member.status
+    user_id = update.chat.id
+    try:
+        if new_status == "kicked":
+            logging.warning(f"User {user_id} has blocked the bot")
+            with get_db_cursor() as cur:
+                cur.execute("""UPDATE light_bot.users
+                            SET blocked_at = NOW()
+                            WHERE user_id = %s;""",
+                            (user_id,)
+                            )
+        elif new_status == "member":
+            old_status = update.old_chat_member.status
+            if old_status == "kicked":
+                logging.info(
+                    f"User {user_id} has unblocked and restarted the bot"
+                )
+                with get_db_cursor() as cur:
+                    cur.execute("""UPDATE light_bot.users
+                                SET blocked_at = NULL
+                                WHERE user_id = %s;""",
+                                (user_id,)
+                                )
+    except Exception as error:
+        logging.error(f"Error: {error}")
 
 
 if __name__ == "__main__":
