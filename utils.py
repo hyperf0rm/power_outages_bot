@@ -2,10 +2,11 @@ import logging
 from dotenv import load_dotenv
 import os
 import sys
+import git
 
 load_dotenv()
 
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.getenv("TOKEN_PROD")
 
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
@@ -19,6 +20,20 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     stream=sys.stdout
 )
+
+
+def branch_is_main(repo_path="."):
+    try:
+        repo = git.Repo(repo_path)
+        current_branch_name = repo.active_branch.name
+
+        return current_branch_name in ["main"]
+    except git.exc.InvalidGitRepositoryError:
+        print(f"Error: No git repository found at '{os.path.abspath(repo_path)}'")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
 
 
 def check_env_vars():
