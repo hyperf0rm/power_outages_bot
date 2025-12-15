@@ -3,13 +3,8 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
 import logging
-from utils import branch_is_main
-import logging_config
 
 load_dotenv()
-
-if branch_is_main():
-    logger = logging_config.setup_logging()
 
 
 class Parser:
@@ -20,12 +15,6 @@ class Parser:
             "Accept": os.getenv("ACCEPT"),
             "User-Agent": os.getenv("USER_AGENT")
         }
-
-    def create_date_list(self, count, initial_value=None):
-        return [initial_value] * count
-
-    def create_places_dict(self, count, initial_value=None):
-        return {f"date_{i}": initial_value for i in range(count)}
 
     def parse_website(self):
         """

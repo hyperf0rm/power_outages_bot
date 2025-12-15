@@ -22,10 +22,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 TOKEN = os.getenv("TOKEN_PROD")
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
+
 if branch_is_main():
+    logger = logging_config.setup_logging()
     TOKEN = os.getenv("TOKEN_PROD")
     DB_NAME = os.getenv("DB_NAME")
-    logger = logging_config.setup_logging()
 else:
     TOKEN = os.getenv("TOKEN_DEV")
     DB_NAME = os.getenv("DB_NAME_DEV")
