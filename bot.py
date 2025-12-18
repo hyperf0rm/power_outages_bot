@@ -22,7 +22,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 TOKEN = os.getenv("TOKEN_PROD")
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
-
 if branch_is_main():
     logger = logging_config.setup_logging()
     TOKEN = os.getenv("TOKEN_PROD")
@@ -32,6 +31,9 @@ else:
     DB_NAME = os.getenv("DB_NAME_DEV")
 
 bot = TeleBot(token=TOKEN)
+
+cached_outages = {}
+outages_lock = threading.Lock()
 
 try:
     db_pool = pool.ThreadedConnectionPool(
@@ -72,7 +74,7 @@ def start(message):
 
                "Рекомендации:\n"
                "- при добавлении или проверке адреса указывайте его "
-               "без дополнительных слов. "
+               "без дополнительных слов и номера дома. "
                "Например: /add Тиграняна\n"
                "- при добавлении села или другого "
                "небольшого населенного пункта указывайте "
@@ -210,10 +212,17 @@ def my(message):
                 (user_id,)
             )
             addresses = [address[0] for address in cur.fetchall()]
-            parser = Parser()
-            outages = parser.parse_website()
+
+            with outages_lock:
+                outages = cached_outages.copy()
+
             if not outages:
                 logging.warning("No data fetched or empty site")
+                bot.send_message(
+                    user_id,
+                    "Данные об отключениях недоступны, попробуйте позже"
+                )
+                return
 
             messages_for_user = []
 
@@ -232,8 +241,7 @@ def my(message):
                 )
 
             else:
-                for i in range(len(messages_for_user)):
-                    new_message = "\n\n".join(messages_for_user)
+                new_message = "\n\n".join(messages_for_user)
 
             new_message_hash = generate_last_message_hash(new_message)
             cur.execute(
@@ -268,10 +276,16 @@ def check(message):
 
     user_address = message.text.replace("/check ", "")
     try:
-        parser = Parser()
-        outages = parser.parse_website()
+        with outages_lock:
+            outages = cached_outages.copy()
+
         if not outages:
             logging.warning("No data fetched or empty site")
+            bot.send_message(
+                user_id,
+                "Данные об отключениях недоступны, попробуйте позже"
+            )
+            return
 
         messages_for_user = []
 
@@ -289,8 +303,7 @@ def check(message):
                 )
 
             else:
-                for i in range(len(messages_for_user)):
-                    message = "\n\n".join(messages_for_user)
+                message = "\n\n".join(messages_for_user)
 
         bot.send_message(user_id, message)
     except Exception as error:
@@ -311,6 +324,7 @@ def msg(message):
 def main():
     logging.info("Starting background job")
     parser = Parser()
+    global cached_outages
 
     while True:
         try:
@@ -321,6 +335,10 @@ def main():
                 logging.warning("No data fetched or empty site")
                 time.sleep(RETRY_PERIOD)
                 continue
+
+            with outages_lock:
+                cached_outages = outages
+            logging.info("Outages dict updated successfully")
 
             with get_db_cursor() as cur:
                 cur.execute(
@@ -343,37 +361,36 @@ def main():
                 user_data[uid]["addresses"].append(address)
 
             for user_id, data in user_data.items():
-                logging.info(f"Checking user {user_id} addresses")
-                user_addresses = data["addresses"]
-                last_message_hash = data["last_msg_hash"]
+                try:
+                    logging.info(f"Checking user {user_id} addresses")
+                    user_addresses = data["addresses"]
+                    last_message_hash = data["last_msg_hash"]
 
-                messages_for_user = []
+                    messages_for_user = []
 
-                for date, addresses_list in outages.items():
-                    for addr in addresses_list:
-                        for user_addr in user_addresses:
-                            if user_addr.lower() in addr.lower():
-                                msg = f"{date}\n\n{addr}"
-                                if msg not in messages_for_user:
-                                    messages_for_user.append(msg)
+                    for date, addresses_list in outages.items():
+                        for addr in addresses_list:
+                            for user_addr in user_addresses:
+                                if user_addr.lower() in addr.lower():
+                                    msg = f"{date}\n\n{addr}"
+                                    if msg not in messages_for_user:
+                                        messages_for_user.append(msg)
 
-                if not messages_for_user:
-                    new_message = (
-                        "Нет информации об отключениях электроэнергии "
-                        "по вашим адресам в ближайшие дни"
-                    )
+                    if not messages_for_user:
+                        new_message = (
+                            "Нет информации об отключениях электроэнергии "
+                            "по вашим адресам в ближайшие дни"
+                        )
 
-                else:
-                    for i in range(len(messages_for_user)):
+                    else:
                         new_message = "\n\n".join(messages_for_user)
 
-                new_message_hash = generate_last_message_hash(new_message)
+                    new_message_hash = generate_last_message_hash(new_message)
 
-                if new_message_hash != last_message_hash:
-                    logging.info(
-                        f"Starting sending main message to user {user_id}"
-                    )
-                    try:
+                    if new_message_hash != last_message_hash:
+                        logging.info(
+                            f"Starting sending main message to user {user_id}"
+                        )
                         with get_db_cursor() as cur:
                             cur.execute(
                                 """UPDATE light_bot.users
@@ -381,11 +398,14 @@ def main():
                                 WHERE user_id = %s;""",
                                 (new_message_hash, user_id)
                             )
-                            logging.info(
-                                f"Updated last message for user {user_id}")
+                        logging.info(
+                            f"Updated last message for user {user_id}"
+                        )
                         bot.send_message(user_id, new_message)
-                    except Exception as error:
-                        logging.error(f"Error: {error}")
+                except Exception as error:
+                    logging.error(
+                        f"Error sending message to user {user_id}: {error}"
+                    )
 
         except Exception as error:
             logging.error(f"Background job error: {error}")
