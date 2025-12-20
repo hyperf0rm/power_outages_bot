@@ -8,7 +8,7 @@ import sys
 from exceptions import MissingEnvironmentVariableException
 import time
 import threading
-from utils import check_env_vars, branch_is_main, generate_last_message_hash
+from utils import check_env_vars, generate_last_message_hash
 from contextlib import contextmanager
 import logging_config
 
@@ -16,19 +16,14 @@ load_dotenv()
 
 DB_HOST = os.getenv("DB_HOST")
 
+DB_NAME = os.getenv("DB_NAME_PROD")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 TOKEN = os.getenv("TOKEN_PROD")
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
-if branch_is_main():
-    logger = logging_config.setup_logging()
-    TOKEN = os.getenv("TOKEN_PROD")
-    DB_NAME = os.getenv("DB_NAME")
-else:
-    TOKEN = os.getenv("TOKEN_DEV")
-    DB_NAME = os.getenv("DB_NAME_DEV")
+logger = logging_config.setup_logging()
 
 bot = TeleBot(token=TOKEN)
 

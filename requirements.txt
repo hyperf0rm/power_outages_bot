@@ -6,7 +6,7 @@ gitdb==4.0.12
 GitPython==3.1.45
 idna==3.11
 lxml==6.0.2
-psycopg2==2.9.11
+psycopg2-binary==2.9.11
 pyTelegramBotAPI==4.29.1
 python-dotenv==1.2.1
 requests==2.32.5
