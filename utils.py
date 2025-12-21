@@ -2,47 +2,23 @@ import logging
 from dotenv import load_dotenv
 import os
 import sys
-import git
 import hashlib
 
 load_dotenv()
 
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
 
+DB_NAME = os.getenv("DB_NAME_PROD")
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+TOKEN = os.getenv("TOKEN_PROD")
 
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     stream=sys.stdout
 )
-
-
-def branch_is_main(repo_path="."):
-    """Check if current git branch is main."""
-    try:
-        repo = git.Repo(repo_path)
-        current_branch_name = repo.active_branch.name
-
-        return current_branch_name in ["main"]
-    except git.exc.InvalidGitRepositoryError:
-        print(
-            f"Error: No git repository found at '{os.path.abspath(repo_path)}'"
-        )
-        return False
-    except Exception as error:
-        print(f"An error occurred: {error}")
-        return False
-
-
-if branch_is_main():
-    TOKEN = os.getenv("TOKEN_PROD")
-    DB_NAME = os.getenv("DB_NAME")
-else:
-    TOKEN = os.getenv("TOKEN_DEV")
-    DB_NAME = os.getenv("DB_NAME_DEV")
 
 
 def check_env_vars():
