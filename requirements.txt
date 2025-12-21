@@ -2,9 +2,15 @@ beautifulsoup4==4.14.2
 certifi==2025.11.12
 charset-normalizer==3.4.4
 dotenv==0.9.9
+flake8==7.3.0
+flake8-isort==7.0.0
 idna==3.11
+isort==5.13.2
 lxml==6.0.2
+mccabe==0.7.0
 psycopg2-binary==2.9.11
+pycodestyle==2.14.0
+pyflakes==3.4.0
 pyTelegramBotAPI==4.29.1
 python-dotenv==1.2.1
 requests==2.32.5
