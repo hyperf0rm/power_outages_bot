@@ -16,3 +16,5 @@ CREATE TABLE light_bot.addresses (
     created_at timestamptz DEFAULT now() NOT NULL
     UNIQUE (user_id, address)
 );
+
+CREATE INDEX IF NOT EXISTS idx_addresses_user_id ON light_bot.addresses(user_id);

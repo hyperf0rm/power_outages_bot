@@ -16,9 +16,9 @@ load_dotenv()
 
 DB_HOST = os.getenv("DB_HOST")
 
-DB_NAME = os.getenv("DB_NAME_PROD")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("POSTGRES_DB")
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
 TOKEN = os.getenv("TOKEN_PROD")
 RETRY_PERIOD = int(os.getenv("RETRY_PERIOD"))
