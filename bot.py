@@ -1,16 +1,18 @@
-from telebot import TeleBot
-from dotenv import load_dotenv
-import os
-from parser import Parser
-from psycopg2 import pool
 import logging
+import os
 import sys
-from exceptions import MissingEnvironmentVariableException
-import time
 import threading
-from utils import check_env_vars, generate_last_message_hash
+import time
 from contextlib import contextmanager
+from parser import Parser
+
+from dotenv import load_dotenv
+from psycopg2 import pool
+from telebot import TeleBot
+
 import logging_config
+from exceptions import MissingEnvironmentVariableException
+from utils import check_env_vars, generate_last_message_hash
 
 load_dotenv()
 
