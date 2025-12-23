@@ -4,7 +4,10 @@ from logging.handlers import RotatingFileHandler
 
 
 def setup_logging():
-    LOG_DIR = "logs"
+    current_file_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_file_dir)
+
+    LOG_DIR = os.path.join(project_root, "logs")
     LOG_FILE_NAME = "bot.log"
     LOG_FILE_PATH = os.path.join(LOG_DIR, LOG_FILE_NAME)
 
