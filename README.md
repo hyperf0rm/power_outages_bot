@@ -4,7 +4,7 @@
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
 
-A Telegram bot for monitoring power outages. The bot allows users to subscribe to notification alerts for specific addresses.
+A Telegram bot for monitoring planned power outages in Armenia. The bot allows users to subscribe to notification alerts for specific addresses.
 
 ## 📋 Features
 
@@ -17,7 +17,7 @@ A Telegram bot for monitoring power outages. The bot allows users to subscribe t
 ## 🛠 Tech Stack
 
 * **Language:** Python 3.14+
-* **Bot Framework:** [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI)
+* **Bot Framework:** pyTelegramBotAPI
 * **Database:** PostgreSQL
 * **DB Driver:** psycopg2-binary
 * **Infrastructure:** Docker, Docker Compose
