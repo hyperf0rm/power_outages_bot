@@ -5,16 +5,17 @@
 ![PostgreSQL](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
 
 A Telegram bot for monitoring planned power outages in Armenia. The bot allows users to subscribe to notification alerts for specific addresses.
+The bot is available in Russian at https://t.me/armenia_power_outages_bot
 
-## 📋 Features
+## Features
 
-* ✅ **User Registration:** Saves user data upon first interaction.
-* 🏠 **Address Management:** Users can add and remove addresses for tracking.
-* 🔔 **Notifications:** Automatic alerts when outages are detected (via data parsing).
-* 🐳 **Docker Support:** Full support for containerized deployment.
-* 🔄 **CI/CD:** Automatic deployment via GitHub Actions (supports x86 and ARM64).
+* **User Registration:** Saves user data upon first interaction.
+* **Address Management:** Users can add and remove addresses for tracking.
+* **Notifications:** Automatic alerts when outages are detected (via data parsing).
+* **Docker Support:** Full support for containerized deployment.
+* **CI/CD:** Automatic deployment via GitHub Actions (supports x86 and ARM64).
 
-## 🛠 Tech Stack
+## Tech Stack
 
 * **Language:** Python 3.14+
 * **Bot Framework:** pyTelegramBotAPI
